@@ -20,10 +20,16 @@ $(document).ready(() => {
     style: styleUrl,
     transformRequest: (url) => {
       let transformedUrl = url;
-      let mapsPathIndex = url.indexOf('/maps/');
-  
+      let mapsPathIndex = url.indexOf('/maps/overlays');
       if (mapsPathIndex > 0) {
-        transformedUrl = 'https://api.myptv.com/' + url.substring(mapsPathIndex) + '?apiKey=' + api_key;
+          transformedUrl = 'https://api.myptv.com' + url.substring(mapsPathIndex) + '&apiKey=' + api_key;
+          return {
+            url: `${transformedUrl}`
+          };
+        } 
+      mapsPathIndex = url.indexOf('/maps/');
+      if (mapsPathIndex > 0) {
+        transformedUrl = 'https://api.myptv.com' + url.substring(mapsPathIndex) + '?apiKey=' + api_key;
         return {
           url: `${transformedUrl}`
         };
@@ -32,12 +38,18 @@ $(document).ready(() => {
     }
   });
 
+  map.on('load', (event) => {
+    if (map.getLayer('TSP_Low_Emission_Zones')) {
+      map.setLayoutProperty('TSP_Low_Emission_Zones', 'visibility', 'visible');
+    }
+  });
+
   // Add controls to the map.
   map.addControl(new maplibregl.NavigationControl());
 
   let mapMarker = undefined; // we keep track of all markers here
   function addMarker(lngLat, textAsHtml) {
-    const popup = new maplibregl.Popup({closeButton: false})
+    const popup = new maplibregl.Popup({ maxWidth:"600px" })
         .setHTML(textAsHtml);
     const marker = new maplibregl.Marker()
       .setLngLat(lngLat)
@@ -55,22 +67,53 @@ $(document).ready(() => {
   function getMapMatchRequest(lngLat) {
     let url = "https://api.myptv.com/mapmatch/v1/positions/";
     url = `${url + lngLat.lat}/${lngLat.lng}`;
-    url = `${url}?results=SEGMENT_LOCATION_DESCRIPTORS`;
+    url = `${url}?results=SEGMENT_LOCATION_DESCRIPTORS,LOW_EMISSION_ZONES`;
     return url;
+  }
+
+  function getPopupContent(lngLat, result) {
+    const coordinate = `<h4>Coordinate: (${normalize(lngLat.lat)}, ${normalize(lngLat.lng)}) --> (${normalize(result.latitude)}, ${normalize(result.longitude)})<h4>`;
+    const address = `<h4>Address: ${result.segmentLocationDescriptors.street}, ${result.segmentLocationDescriptors.postalCode} ${result.segmentLocationDescriptors.city}<h4>`;
+    const lowEmissionZones = getLowEmissionZones(result.lowEmissionZones);
+    return coordinate + address + lowEmissionZones;
+  }
+
+  function getCoordinates(lngLat, result) {
+      return `<h4>Coordinate: (${normalize(lngLat.lat)}, ${normalize(lngLat.lng)}) --> (${normalize(result.latitude)}, ${normalize(result.longitude)})<h4>`;
+  }
+
+  function getAddress(segmentLocationDescriptors) {
+      if(!segmentLocationDescriptors) return '-';
+      return `<h4>Address: ${result.segmentLocationDescriptors.street || '' }, ${result.segmentLocationDescriptors.postalCode} ${result.segmentLocationDescriptors.city}<h4>`
+  }
+
+  function getLowEmissionZones(lowEmissionZones) {
+    let results = '';
+    if(!lowEmissionZones) return results;
+       
+    lowEmissionZones.forEach((lowEmissionZone) => {
+      results +=
+        `<h4>${lowEmissionZone.name}</h4>
+        <ul>
+          <li>Approvals: ${lowEmissionZone.approvals?.join(',') || ''}</li>
+          <li>Fuel Types: ${lowEmissionZone.fuelTypes?.join(',') || ''}</li>
+          <li>Vehicle Categories: ${lowEmissionZone.vehicleCategories?.join(',') || ''}</li>
+        </ul>`;
+    });
+    return results;
   }
 
   function showMapMatchResult(lngLat, result, action) {
     const inputLatitude = normalize(lngLat.lat);
     const inputLongitude = normalize(lngLat.lng);
     if (Object.keys(result).length === 0) {
-      action(lngLat, `(${inputLatitude}, ${inputLongitude}) --> <br> no result`);
+      action(lngLat, `<h4>(${inputLatitude}, ${inputLongitude}) --> no result</h4>`);
     } else {
       if (result.longitude && result.latitude) {
         const resultLatitude = normalize(result.latitude);
         const resultLongitude = normalize(result.longitude);
         action({ lat: result.latitude, lng: result.longitude },
-          `(${inputLatitude}, ${inputLongitude}) --> <br> (${resultLatitude}, ${resultLongitude}) : <br>` +
-          `${result.segmentLocationDescriptors.street} (${result.segmentLocationDescriptors.city})`);
+          getPopupContent(lngLat, result));
       } else {
         action(lngLat, JSON.stringify(result, null, 4));
       }
