@@ -78,27 +78,30 @@ $(document).ready(() => {
     return coordinate + address + lowEmissionZones;
   }
 
-  function getCoordinates(lngLat, result) {
-      return `<h4>Coordinate: (${normalize(lngLat.lat)}, ${normalize(lngLat.lng)}) --> (${normalize(result.latitude)}, ${normalize(result.longitude)})<h4>`;
-  }
-
-  function getAddress(segmentLocationDescriptors) {
-      if(!segmentLocationDescriptors) return '-';
-      return `<h4>Address: ${result.segmentLocationDescriptors.street || '' }, ${result.segmentLocationDescriptors.postalCode} ${result.segmentLocationDescriptors.city}<h4>`
-  }
-
   function getLowEmissionZones(lowEmissionZones) {
     let results = '';
-    if(!lowEmissionZones) return results;
-       
+    if (!lowEmissionZones) return results;
+
     lowEmissionZones.forEach((lowEmissionZone) => {
       results +=
         `<h4>${lowEmissionZone.name}</h4>
         <ul>
           <li>Approvals: ${lowEmissionZone.approvals?.join(',') || ''}</li>
           <li>Fuel Types: ${lowEmissionZone.fuelTypes?.join(',') || ''}</li>
-          <li>Vehicle Categories: ${lowEmissionZone.vehicleCategories?.join(',') || ''}</li>
-        </ul>`;
+          <li>Vehicle Categories: ${lowEmissionZone.vehicleCategories?.join(',') || ''}</li>`;
+      results += `<p><b>Vehicle Restrictions:</b>`;
+      lowEmissionZone.vehicles.forEach((vehicle) => {
+        results +=
+          `<ul>
+            <li>Vehicle Category: ${vehicle.vehicleCategory}</li>
+            <li>Time Restriction: ${vehicle.timeRestrictions}</li>
+            <li>Fuel Types: ${vehicle.fuelTypes}</li>
+            <li>Emission Standards: ${vehicle.emissionStandards}</li>
+            <li>Vehicle Attributes: ${JSON.stringify(vehicle.vehicleAttributes)}</li>
+          </ul></p>`;
+      });
+
+      results += `</p></ul>`;
     });
     return results;
   }
